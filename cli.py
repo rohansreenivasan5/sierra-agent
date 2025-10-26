@@ -8,7 +8,7 @@ WELCOME_MESSAGE = "🏔️  Welcome to Sierra Outfitters Customer Service! 🏔�
 EXIT_MESSAGE = "\n\nThanks for choosing Sierra Outfitters! Onward into the unknown! 🏔️"
 
 def main():
-    setup_logging()
+    #setup_logging()
     
     try:
         settings = Settings.from_env()

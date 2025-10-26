@@ -14,7 +14,6 @@ USE_EMBEDDINGS = False
 try:
     import spacy
     USE_EMBEDDINGS = True
-    print("spaCy available - using neural embedding-based search")
 except ImportError:
     print("spaCy not available - using keyword-based search")
 
