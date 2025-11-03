@@ -25,7 +25,8 @@ class TestDataIngestionAndSetup:
     def test_config_loading(self):
         """Test configuration loading and paths."""
         # Test that paths are correctly configured
-        assert Paths.BASE_DIR.name == 'sierra_agent'
+        # Accept hyphen or underscore in project directory name
+        assert Paths.BASE_DIR.name.replace('-', '_') == 'sierra_agent'
         assert Paths.DATA_DIR.name == 'data'
         assert Paths.ORDERS_FILE.name == 'orders.json'
         assert Paths.PRODUCTS_FILE.name == 'products.json'
