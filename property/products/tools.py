@@ -24,21 +24,30 @@ def recommend_products(query: str) -> str:
     """
     Search for and recommend products from the catalog based on a free-text query.
     Returns JSON string with up to MAX_PRODUCT_RECOMMENDATIONS product recommendations.
+    Uses semantic similarity search with keyword fallback.
     """
     logger.info(f"recommend_products called with query='{query}'")
     
     try:
         product_service = _get_product_service()
         
-        # Search for products using keyword matching
-        query_terms = query.strip().split()
-        products = product_service.search_by_terms(query_terms) if query_terms else []
+
+        products = product_service.search_by_similarity(query, top_k=MAX_PRODUCT_RECOMMENDATIONS, threshold=0.25)
         
-        # Limit to max recommendations or return all if no matches
+
         if not products:
-            products = product_service.get_all()
-        
-        products = products[:MAX_PRODUCT_RECOMMENDATIONS]
+            product_service = _get_product_service()
+            # Check if we should fallback (only if embeddings not available)
+            if not product_service._use_embeddings:
+                # Embeddings not available - use keyword matching
+                query_terms = query.strip().split()
+                products = product_service.search_by_terms(query_terms) if query_terms else []
+                
+                # If still no matches, return all products (limited)
+                if not products:
+                    products = product_service.get_all()
+                
+                products = products[:MAX_PRODUCT_RECOMMENDATIONS]
         
         # Format abbreviated product information for the LLM
         abbreviated_product_list = []

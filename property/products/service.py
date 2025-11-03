@@ -73,9 +73,23 @@ class ProductService:
         """Search using spaCy neural embeddings if available, otherwise keyword matching."""
         if self._use_embeddings and self._spacy_nlp:
             try:
+                # Skip empty queries to avoid spaCy errors
+                if not query or not query.strip():
+                    logger.warning("Empty query, falling back to keyword search")
+                    query_terms = []
+                    matching_products = self.search_by_terms(query_terms)
+                    return matching_products[:top_k] if matching_products else self._products[:top_k]
+                
                 # Compute query embedding
                 query_doc = self._spacy_nlp(query)
                 query_embedding = query_doc.vector
+                
+                # Check if query embedding is valid (non-zero)
+                if np.linalg.norm(query_embedding) == 0:
+                    logger.warning("Zero query embedding, falling back to keyword search")
+                    query_terms = query.strip().split()
+                    matching_products = self.search_by_terms(query_terms)
+                    return matching_products[:top_k] if matching_products else self._products[:top_k]
                 
                 # Compute cosine similarity with all products
                 similarities = []
@@ -85,23 +99,37 @@ class ProductService:
                     product_embedding = product_doc.vector
                     
                     # Compute cosine similarity
+                    product_norm = np.linalg.norm(product_embedding)
+                    if product_norm == 0:
+                        continue  # Skip products with zero embeddings
+                    
                     similarity = np.dot(query_embedding, product_embedding) / (
-                        np.linalg.norm(query_embedding) * np.linalg.norm(product_embedding)
+                        np.linalg.norm(query_embedding) * product_norm
                     )
                     similarities.append((product, similarity))
                 
-                # Sort by similarity and filter by threshold
+                # Sort by similarity (descending)
                 similarities.sort(key=lambda x: x[1], reverse=True)
-                results = [product for product, sim in similarities if sim >= threshold][:top_k]
+                
+                # Filter by threshold and take top_k
+                filtered_results = [product for product, sim in similarities if sim >= threshold]
+                
+                # If threshold filtering removes all results, return top results anyway (embeddings are working)
+                if not filtered_results and similarities:
+                    logger.info(f"No products above threshold {threshold}, returning top {top_k} results by similarity")
+                    results = [product for product, sim in similarities[:top_k]]
+                else:
+                    results = filtered_results[:top_k]
                 
                 if results:
-                    logger.info(f"Found {len(results)} products using spaCy neural embeddings")
+                    logger.info(f"Found {len(results)} products using spaCy neural embeddings (threshold: {threshold})")
                     return results
+                    
             except Exception as e:
                 logger.warning(f"spaCy search failed: {e}, falling back to keyword search")
         
-        # Fallback to keyword matching
-        query_terms = query.strip().split()
+        # Fallback to keyword matching (only if embeddings not available or failed)
+        query_terms = query.strip().split() if query else []
         matching_products = self.search_by_terms(query_terms)
         return matching_products[:top_k] if matching_products else self._products[:top_k]
     
